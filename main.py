@@ -18,10 +18,10 @@ jwt = JWTManager(app)
 # Conexión a la base de datos PostgreSQL
 def get_db_connection():
     conn = psycopg2.connect(
-        host='localhost',
-        user='postgres',
-        password='admin',
-        database='phishguard'
+        host='dpg-csrp9g3tq21c739nl0vg-a.oregon-postgres.render.com',
+        user='phishguard_0d2p_user',
+        password='UQFLVy0Q6ZmbCKvdpGQ6cWyR30A8tJE5',
+        database='phishguard_0d2p'
     )
     # print("conn: ",conn)
     return conn
