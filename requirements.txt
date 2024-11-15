@@ -18,3 +18,4 @@ scapy
 secure-smtplib
 urllib3
 Werkzeug
+yagmail
