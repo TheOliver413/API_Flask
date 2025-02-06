@@ -4,40 +4,53 @@ CREATE DATABASE phishguard;
 -- Conecciòn a la Base de datos;
 \c phishguard;
 
--- Crear la tabla Usuarios
-CREATE TABLE users (
+-- Table: public.users
+CREATE TABLE IF NOT EXISTS public.users (
     user_id SERIAL PRIMARY KEY,
     username VARCHAR(50) NOT NULL,
-    email VARCHAR(100) NOT NULL UNIQUE,
+    email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    registration_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    registration_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     role VARCHAR(20) NOT NULL
 );
 
--- Crear la tabla URLs
-CREATE TABLE URLS (
-	ID_URL SERIAL PRIMARY KEY,
-	URL VARCHAR(500) NOT NULL,
-	FECHA_VERIFICACION TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	ESTADO VARCHAR(50) NOT NULL,
-	RIESGO_PORCENTAJE FLOAT NOT NULL,
-	ID_USUARIO INT REFERENCES USUARIOS (ID_USUARIO) ON DELETE CASCADE
+-- Table: public.urls
+CREATE TABLE IF NOT EXISTS public.urls (
+    url_id SERIAL PRIMARY KEY,
+    url VARCHAR(500) NOT NULL,
+    verification_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    status VARCHAR(50) NOT NULL,
+    risk_percentage NUMERIC(5, 2) NOT NULL,
+    user_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP,
+    CONSTRAINT fk_urls_users FOREIGN KEY (user_id) REFERENCES public.users (user_id) ON DELETE CASCADE
 );
 
--- Crear la tabla Análisis
-CREATE TABLE ANALISIS (
-	ID_ANALISIS SERIAL PRIMARY KEY,
-	ID_URL INT REFERENCES URLS (ID_URL) ON DELETE CASCADE,
-	RESULTADO_TRACEROUTE TEXT NOT NULL,
-	METODOLOGIA VARCHAR(100) NOT NULL,
-	RIESGO_PORCENTAJE FLOAT NOT NULL,
-	FECHA_ANALISIS TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+-- Table: public.providers
+CREATE TABLE IF NOT EXISTS public.providers (
+    provider_id SERIAL PRIMARY KEY,
+    provider_name VARCHAR(100) NOT NULL,
+    provider_email VARCHAR(100) UNIQUE NOT NULL,
+    url_id INT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT fk_providers_urls FOREIGN KEY (url_id) REFERENCES public.urls (url_id) ON DELETE CASCADE
 );
 
--- Crear la tabla Proveedores
-CREATE TABLE PROVEEDORES (
-	ID_PROVEEDOR SERIAL PRIMARY KEY,
-	NOMBRE_PROVEEDOR VARCHAR(100) NOT NULL,
-	CORREO_PROVEEDOR VARCHAR(100) NOT NULL,
-	ID_URL INT REFERENCES URLS (ID_URL) ON DELETE CASCADE
+-- Table: public.analysis
+CREATE TABLE IF NOT EXISTS public.analysis (
+    analysis_id SERIAL PRIMARY KEY,
+    url_id INT NOT NULL,
+    traceroute_result TEXT NOT NULL,
+    methodology VARCHAR(100) NOT NULL,
+    risk_percentage NUMERIC(5, 2) NOT NULL,
+    analysis_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP,
+    CONSTRAINT fk_analysis_urls FOREIGN KEY (url_id) REFERENCES public.urls (url_id) ON DELETE CASCADE
 );
+
+-- Indexes
+CREATE INDEX idx_users_email ON public.users (email);
+CREATE INDEX idx_urls_status ON public.urls (status);
+CREATE INDEX idx_analysis_date ON public.analysis (analysis_date);
