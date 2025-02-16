@@ -17,20 +17,29 @@ jwt = JWTManager(app)
 
 # Conexión a la base de datos PostgreSQL
 def get_db_connection():
-    conn = psycopg2.connect(
-        host='dpg-cthdgfggph6c73dc16p0-a.oregon-postgres.render.com',
-        user='phishguard_kx31_user',
-        password='mp5LZlEwsKR5xjdopbNaauyRpBd05fka',
-        database='phishguard_kx31'
-    )
-    # print("conn: ",conn)
-    return conn
+    try:
+        conn = psycopg2.connect(
+            host='localhost',
+            user='postgres',
+            password='admin',
+            database='phishguard'
+        )
+        print("✅ Conexión a la base de datos establecida correctamente.")
+        return conn
+    except psycopg2.OperationalError as e:
+        print("❌ Error de conexión a la base de datos:")
+        print(e)
+        return None
+    except Exception as e:
+        print("⚠️ Error inesperado:")
+        print(e)
+        return None
 
 # Función para obtener la IP desde el dominio
 def get_ip_from_url(url):
     try:
         ip = socket.gethostbyname(url)
-        # print("conn: ",ip)
+        print("conn: ",ip)
         return ip
     except socket.gaierror as e:
         if e.errno == socket.EAI_NONAME:
@@ -126,24 +135,24 @@ def save_url_and_analysis(url, ip, phishing_message, reputation_result):
     cur = conn.cursor()
 
     # Verificar si la URL ya está en la base de datos
-    cur.execute("SELECT id_url FROM urls WHERE url = %s", (url,))
+    cur.execute("SELECT url_id FROM urls WHERE url = %s", (url,))
     result = cur.fetchone()
 
     if not result:
         # Si no existe, insertar la nueva entrada en 'urls'
         cur.execute("""
-            INSERT INTO urls (url, estado, riesgo_porcentaje)
+            INSERT INTO urls (url, status, risk_percentage)
             VALUES (%s, %s, %s)
-            RETURNING id_url
+            RETURNING url_id
         """, (url, phishing_message, calcular_riesgo(phishing_message, reputation_result)))
         url_id = cur.fetchone()[0]
     else:
-        # Si ya existe, recuperar su id_url
+        # Si ya existe, recuperar su url_id
         url_id = result[0]
 
     # Insertar el análisis asociado en la tabla 'analisis'
     cur.execute("""
-        INSERT INTO analisis (id_url, resultado_traceroute, metodologia, riesgo_porcentaje)
+        INSERT INTO analysis (url_id, traceroute_result, methodology, risk_percentage)
         VALUES (%s, %s, %s, %s)
     """, (url_id, "Traceroute result placeholder", "Metodología utilizada", calcular_riesgo(phishing_message, reputation_result)))
 
@@ -222,25 +231,41 @@ def register():
 
     # Conexión a la base de datos
     conn = get_db_connection()
-    cur = conn.cursor()
+    if conn is None:
+        return jsonify({'msg': 'Error de conexión a la base de datos'}), 500  # Retorna un error HTTP 500
 
-    # Verificar si el usuario ya existe
-    cur.execute("SELECT user_id FROM users WHERE username = %s", (username,))
-    user = cur.fetchone()
+    try:
+        cur = conn.cursor()
 
-    if user:
-        return jsonify({'msg': 'Usuario ya existe'}), 400
+        # Verificar si el usuario ya existe
+        cur.execute("SELECT user_id FROM users WHERE username = %s", (username,))
+        user = cur.fetchone()
 
-    # Crear el nuevo usuario
-    cur.execute("INSERT INTO users (username, password, email, role) VALUES (%s, %s, %s, %s) RETURNING user_id", 
-                (username, hashed_password, email, role))
-    conn.commit()
+        if user:
+            cur.close()
+            conn.close()
+            return jsonify({'msg': 'Usuario ya existe'}), 400
 
-    user_id = cur.fetchone()[0]
-    cur.close()
-    conn.close()
+        # Crear el nuevo usuario
+        cur.execute("INSERT INTO users (username, password, email, role) VALUES (%s, %s, %s, %s) RETURNING user_id", 
+                    (username, hashed_password, email, role))
+        conn.commit()
 
-    return jsonify({'msg': 'Usuario registrado exitosamente', 'user_id': user_id}), 201
+        user_id = cur.fetchone()[0]
+        cur.close()
+        conn.close()
+
+        return jsonify({'msg': 'Usuario registrado exitosamente', 'user_id': user_id}), 201
+    
+    except psycopg2.Error as e:
+        print("❌ Error en la consulta SQL:", e)
+        return jsonify({'msg': 'Error en la base de datos', 'error': str(e)}), 500
+    except Exception as e:
+        print("⚠️ Error inesperado:", e)
+        return jsonify({'msg': 'Error interno del servidor', 'error': str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 # Login de usuario
 @app.route('/login', methods=['POST'])

@@ -13,7 +13,7 @@ try:
     cursor.execute("SELECT version()")
     row=cursor.fetchone()
     print(row)
-    cursor.execute("SELECT * FROM USUARIOS")
+    cursor.execute("SELECT * FROM USERS")
     rows=cursor.fetchall()
     for row in rows:
         print(row)
