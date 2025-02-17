@@ -9,6 +9,8 @@ import yagmail
 from scapy.all import sr1, IP, ICMP, conf
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
+from newsapi import NewsApiClient #Libreria apra el uso de NewsApi
+
 
 
 app = Flask(__name__)
@@ -342,13 +344,17 @@ if __name__ == '__main__':
 #--------------------------------  NEWS API --------------------------------------
 #---------------------------------------------------------------------------------
 
-##Conexión al api de noticias 
-# url = ('https://newsapi.org/v2/everything?'
-#        'q=Apple&'
-#        'from=2025-02-16&'
-#        'sortBy=popularity&'
-#        'apiKey=***************************')
+newsapi = NewsApiClient(api_key='ad037202cf534cacb580a1fb12c97eb4')
 
-# response = requests.get(url)
 
-# print r.json
+all_articles = newsapi.get_everything(q='ciberseguridad',
+                                      sources='',
+                                      domains='',
+                                      from_param='2025-02-01',
+                                      to='2025-02-17',
+                                      language='es',
+                                      sort_by='relevancy',
+                                      page=2)
+
+
+sources = newsapi.get_sources()
