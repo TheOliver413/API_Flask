@@ -335,20 +335,3 @@ def send_email_route():
         return jsonify({"message": "Error en el servidor"}), 500
 if __name__ == '__main__':
     app.run(debug=True, host="0.0.0.0")
-    
-    
-    
-#---------------------------------------------------------------------------------
-#--------------------------------  NEWS API --------------------------------------
-#---------------------------------------------------------------------------------
-
-##Conexión al api de noticias 
-# url = ('https://newsapi.org/v2/everything?'
-#        'q=Apple&'
-#        'from=2025-02-16&'
-#        'sortBy=popularity&'
-#        'apiKey=***************************')
-
-# response = requests.get(url)
-
-# print r.json
