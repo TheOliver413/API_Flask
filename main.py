@@ -343,18 +343,23 @@ if __name__ == '__main__':
 #---------------------------------------------------------------------------------
 #--------------------------------  NEWS API --------------------------------------
 #---------------------------------------------------------------------------------
+@app.route('/NoticiasApi')
 
-newsapi = NewsApiClient(api_key='ad037202cf534cacb580a1fb12c97eb4')
-
-
-all_articles = newsapi.get_everything(q='ciberseguridad',
-                                      sources='',
-                                      domains='',
-                                      from_param='2025-02-01',
-                                      to='2025-02-17',
-                                      language='es',
-                                      sort_by='relevancy',
-                                      page=2)
+def searchs_notices():
+    
+    newsapi = NewsApiClient(api_key='ad037202cf534cacb580a1fb12c97eb4')
 
 
-sources = newsapi.get_sources()
+    all_articles = newsapi.get_everything(q='ciberseguridad',
+                                        sources='',
+                                        domains='',
+                                        from_param='2025-02-01',
+                                        to='2025-02-17',
+                                        language='es',
+                                        sort_by='relevancy',
+                                        page=2)
+
+
+    return jsonify(sources = newsapi.get_sources())
+
+
