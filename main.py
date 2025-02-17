@@ -347,7 +347,7 @@ if __name__ == '__main__':
 #        'q=Apple&'
 #        'from=2025-02-16&'
 #        'sortBy=popularity&'
-#        'apiKey=ad037202cf534cacb580a1fb12c97eb4')
+#        'apiKey=***************************')
 
 # response = requests.get(url)
 
