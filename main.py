@@ -343,7 +343,7 @@ if __name__ == '__main__':
 #---------------------------------------------------------------------------------
 #--------------------------------  NEWS API --------------------------------------
 #---------------------------------------------------------------------------------
-@app.route('/NoticiasApi')
+@app.route('/news-api', methods=['POST'])
 
 def searchs_notices():
     
@@ -357,9 +357,9 @@ def searchs_notices():
                                         to='2025-02-17',
                                         language='es',
                                         sort_by='relevancy',
-                                        page=2)
+                                        page=10)
 
 
-    return jsonify(sources = newsapi.get_sources())
+    return jsonify(sources = newsapi.get_sources(all_articles))
 
 
