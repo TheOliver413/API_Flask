@@ -6,10 +6,11 @@ from flask import Flask, request, jsonify
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import yagmail
-from scapy.all import sr1, IP, ICMP, conf
+import re
+from scapy.all import sr1, IP, ICMP, conf, traceroute
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
-
+from urllib.parse import urlparse
 
 app = Flask(__name__)
 app.config["JWT_SECRET_KEY"] = "your_secret_key"  # Cambia esto por una clave secreta segura
@@ -51,17 +52,21 @@ def get_ip_from_url(url):
 # Función para realizar el mapeo de red
 def get_network_mapping(ip):
     try:
-        conf.verb = 0
+        conf.L3socket = conf.L3socket  # Fuerza a usar la configuración de red adecuada
+        conf.verb = 0  # Silenciar output de Scapy
+        
         packet = IP(dst=ip)/ICMP()
-        response = sr1(packet, timeout=10)
-        print("response: ",response)
+        response = sr1(packet, timeout=5, verbose=False)
+
         if response:
+            print(f"Respuesta recibida desde: {response.src}")
             return response.src
         else:
-            print(f"No se recibió respuesta para el mapeo de red de la IP '{ip}'.")
+            print(f"No se recibió respuesta de '{ip}'.")
             return None
+
     except Exception as e:
-        print(f"Error realizando el mapeo de red para la IP '{ip}': {e}")
+        print(f"Error en mapeo de red para '{ip}': {e}")
         return None
 
 # Función para obtener información de hosting y DNS
@@ -87,27 +92,88 @@ def check_domain_reputation(domain):
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
             data = response.json()
-            # print("data: ",data)
-            reputation = data['data']['attributes'].get('reputation', None)
-            # print("reputation: ",reputation)
-            if reputation and reputation < 0:
-                return "Posible phishing (reputación negativa)."
+            
+            # Obtener reputación general
+            reputation = data['data']['attributes'].get('reputation', 0)
+            
+            # Obtener estadísticas de análisis de antivirus
+            analysis_stats = data['data']['attributes'].get('last_analysis_stats', {})
+
+            # Cantidad de motores que marcaron el dominio como sospechoso o malicioso
+            malicious_count = analysis_stats.get('malicious', 0)
+            suspicious_count = analysis_stats.get('suspicious', 0)
+
+            # Evaluación final
+            if malicious_count > 0 or suspicious_count > 0 or reputation < 0:
+                return f"⚠️ Posible phishing ({malicious_count} motores detectaron amenazas)."
             else:
-                return "Reputación del dominio positiva."
+                return "✅ Reputación del dominio positiva."
+
         else:
-            print(f"Error: El servidor respondió con el código de estado {response.status_code}")
-            return "No se pudo verificar la reputación del dominio."
+            return f"⚠️ Error: No se pudo verificar la reputación del dominio (código {response.status_code})."
+
     except requests.RequestException as e:
-        print(f"Error al verificar la reputación del dominio '{domain}': {e}")
-        return "No se pudo verificar la reputación del dominio."
+        return f"⚠️ Error al conectar con VirusTotal: {e}"
 
 # Función para buscar patrones sospechosos en la URL
 def check_phishing_patterns(url):
-    phishing_keywords = ["login", "secure", "verify", "account", "update", "signin", "payment"]
+    # Palabras clave comunes en URLs de phishing
+    phishing_keywords = [
+        "login", "secure", "verify", "account", "update", "signin", "payment",
+        "banking", "authenticate", "confirm", "support", "service", "billing",
+        "password", "recover", "reset", "unlock", "identity", "credential"
+    ]
+    
+    # Acortadores de URL comunes (altamente sospechosos)
+    url_shorteners = ["bit.ly", "goo.gl", "tinyurl.com", "ow.ly", "t.co"]
+
+    # Extraer componentes de la URL
+    parsed_url = urlparse(url)
+    domain = parsed_url.netloc.lower()
+    path = parsed_url.path.lower()
+    query = parsed_url.query.lower()
+    fragment = parsed_url.fragment.lower()
+
+    detected_patterns = []
+
+    # Buscar palabras clave sospechosas en diferentes partes de la URL
     for keyword in phishing_keywords:
-        if keyword in url.lower():
-            return True
-    return False
+        pattern = rf"\b{keyword}\b"
+        if re.search(pattern, domain):
+            detected_patterns.append(f"'{keyword}' en el dominio")
+        if re.search(pattern, path):
+            detected_patterns.append(f"'{keyword}' en la ruta")
+        if re.search(pattern, query):
+            detected_patterns.append(f"'{keyword}' en la consulta")
+        if re.search(pattern, fragment):
+            detected_patterns.append(f"'{keyword}' en el fragmento")
+
+    # Detectar subdominios sospechosos (ej: secure-login.example.com)
+    subdomains = domain.split(".")[:-2]  # Excluir dominio principal y TLD
+    if any(keyword in subdomains for keyword in phishing_keywords):
+        detected_patterns.append("Uso sospechoso de subdominios")
+
+    # Detectar el uso de acortadores de URL
+    if any(shortener in domain for shortener in url_shorteners):
+        detected_patterns.append("Uso de un acortador de URL (altamente sospechoso)")
+
+    # Detectar el uso de caracteres sospechosos en el dominio
+    if "@" in domain or domain.count("-") > 2 or domain.count(".") > 3:
+        detected_patterns.append("Uso de caracteres sospechosos en el dominio")
+
+    # Determinar nivel de riesgo
+    risk_level = "Bajo"
+    if len(detected_patterns) > 2:
+        risk_level = "Alto"
+    elif len(detected_patterns) > 0:
+        risk_level = "Medio"
+
+    # Generar mensaje detallado
+    if detected_patterns:
+        phishing_message = f"La URL presenta posibles riesgos de phishing: {', '.join(detected_patterns)}."
+        return {"detected": True, "message": phishing_message, "risk_level": risk_level}
+    
+    return {"detected": False, "message": "La URL no contiene patrones de phishing sospechosos.", "risk_level": "Ninguno"}
     
 # Función para enviar un correo electrónico
 def send_email(subject, body, recipient_email):        
@@ -129,46 +195,79 @@ def send_email(subject, body, recipient_email):
         print(f"Error enviando correo: {e}")
         return f"Error enviando correo: {e}"
 
+# Función para realizar un traceroute
+def get_traceroute(ip):
+    try:
+        url = f"https://api.hackertarget.com/mtr/?q={ip}"
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code == 200:
+            return response.text  # Devuelve el resultado como lo entrega la API
+        else:
+            return f"Error en la API: {response.status_code}"
+    except requests.RequestException as e:
+        return f"Error al obtener traceroute: {e}"
+
 # Función para guardar resultados en la tabla 'urls'
-def save_url_and_analysis(url, ip, phishing_message, reputation_result):
+def save_url_and_analysis(url, ip, phishing_message, reputation_result, user_id):
     conn = get_db_connection()
-    cur = conn.cursor()
+    if not conn:
+        return "Error en la conexión a la base de datos."
 
-    # Verificar si la URL ya está en la base de datos
-    cur.execute("SELECT url_id FROM urls WHERE url = %s", (url,))
-    result = cur.fetchone()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                traceroute_result = get_traceroute(ip)
+                print("traceroute_result: "+traceroute_result)
+                
+                cur.execute("SELECT url_id FROM urls WHERE url = %s", (url,))
+                result = cur.fetchone()
 
-    if not result:
-        # Si no existe, insertar la nueva entrada en 'urls'
-        cur.execute("""
-            INSERT INTO urls (url, status, risk_percentage)
-            VALUES (%s, %s, %s)
-            RETURNING url_id
-        """, (url, phishing_message, calcular_riesgo(phishing_message, reputation_result)))
-        url_id = cur.fetchone()[0]
-    else:
-        # Si ya existe, recuperar su url_id
-        url_id = result[0]
+                if not result:
+                    cur.execute("""
+                        INSERT INTO urls (url, status, risk_percentage, user_id)
+                        VALUES (%s, %s, %s, %s) RETURNING url_id
+                    """, (url, "Analizado", calcular_riesgo(phishing_message, reputation_result), user_id))
+                    url_id = cur.fetchone()[0]
+                else:
+                    url_id = result[0]
 
-    # Insertar el análisis asociado en la tabla 'analisis'
-    cur.execute("""
-        INSERT INTO analysis (url_id, traceroute_result, methodology, risk_percentage)
-        VALUES (%s, %s, %s, %s)
-    """, (url_id, "Traceroute result placeholder", "Metodología utilizada", calcular_riesgo(phishing_message, reputation_result)))
-
-    conn.commit()
-    cur.close()
-    conn.close()
+                cur.execute("""
+                    INSERT INTO analysis (url_id, traceroute_result, methodology, risk_percentage)
+                    VALUES (%s, %s, %s, %s)
+                """, (url_id, traceroute_result, "Comparativa en bases de datos de phishing global por comparación y mapeo de URL", 
+                      calcular_riesgo(phishing_message, reputation_result)))
+    except Exception as e:
+        print("Error guardando en DB:", e)
+    finally:
+        conn.close()
 
 # Función auxiliar para calcular el riesgo basado en la reputación y el phishing detectado
 def calcular_riesgo(phishing_message, reputation_result):
     riesgo = 0
-    if "phishing" in phishing_message:
-        riesgo += 50
+
+    # Evaluar el resultado de check_phishing_patterns
+    if phishing_message.get("detected"):
+        risk_level = phishing_message.get("risk_level", "Ninguno")
+
+        if risk_level == "Bajo":
+            riesgo += 20
+        elif risk_level == "Medio":
+            riesgo += 40
+        elif risk_level == "Alto":
+            riesgo += 60
+
+    # Evaluar el resultado de check_domain_reputation
     if "Posible phishing" in reputation_result:
-        riesgo += 50
-        
-        print("riesgo: ",riesgo)
+        # Extraer cantidad de motores detectando amenazas
+        match = re.search(r"(\d+) motores detectaron amenazas", reputation_result)
+        detecciones = int(match.group(1)) if match else 1  # Si no encuentra número, al menos 1
+        riesgo += min(detecciones * 10, 50)  # Máximo +50 puntos
+
+    # Ajuste final para evitar valores extremos
+    riesgo = min(riesgo, 100)
+
+    print("Riesgo calculado:", riesgo)
     return riesgo
 
 @app.route('/validate_url', methods=['POST'])
@@ -176,6 +275,7 @@ def validate_url():
     data = request.json
     url = data.get('url')
     email = data.get('email')
+    user_id = data.get('user_id')
     
     if not url:
         return jsonify({'error': 'No URL provided'}), 400
@@ -184,36 +284,36 @@ def validate_url():
     
     # Obtener IP
     ip = get_ip_from_url(domain)
-    if not ip:
+    if not ip:  
         return jsonify({'error': 'No se pudo resolver la IP'}), 400
     
     # Verificar patrones de phishing
     phishing_detected = check_phishing_patterns(url)
-    
-    phishing_message = "La URL contiene patrones comunes de phishing." if phishing_detected else "La URL no contiene patrones comunes de phishing."
+    print("phishing_detected: ",phishing_detected)
     
     # Verificar reputación
     reputation_result = check_domain_reputation(domain)
-    
+    print("reputation_result: "+reputation_result)
     # Mapeo de red
-    network_mapping_result = get_network_mapping(ip)
+    # network_mapping_result = get_network_mapping(ip)
 
     # Guardar resultados en la base de datos si no existe
-    save_url_and_analysis(url, ip, phishing_message, reputation_result)
+    save_url_and_analysis(url, ip, phishing_detected, reputation_result, user_id)
     
     # Enviar correo si se detecta phishing
     if phishing_detected:
         subject = "Alerta de Phishing"
-        body = f"Se ha detectado posible phishing en la URL: {url}\nDetalles:\nDominio: {domain}\nIP: {ip}\nMensaje: {phishing_message}\nReputación: {reputation_result}"
+        body = f"Se ha detectado posible phishing en la URL: {url}\nDetalles:\nDominio: {domain}\nIP: {ip}\nMensaje: {phishing_detected}\nReputación: {reputation_result}"
         send_email(subject, body, email)
 
     # Responder con los resultados
     return jsonify({
         'domain': domain,
         'ip': ip,
-        'phishing_message': phishing_message,
+        'phishing_message': phishing_detected,
         'reputation_result': reputation_result
     })
+    
 # Registro de un nuevo usuario
 @app.route('/register', methods=['POST'])
 def register():
@@ -334,4 +434,4 @@ def send_email_route():
         print(f"Error en la ruta: {e}")
         return jsonify({"message": "Error en el servidor"}), 500
 if __name__ == '__main__':
-    app.run(debug=True, host="0.0.0.0")
+    app.run(debug=False, host="0.0.0.0")
