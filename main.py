@@ -348,8 +348,8 @@ if __name__ == '__main__':
 newsapi = NewsApiClient(api_key='ad037202cf534cacb580a1fb12c97eb4')
 
 
-@app.route('/api/noticias', methods=['GET'])
-def obtener_noticias():
+@app.route('/news', methods=['GET'])
+def searchs_news():
     try:
         # Obtener parámetros de la petición (siempre en español)
         query = request.args.get('query', 'ciberseguridad')
