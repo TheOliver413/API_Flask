@@ -1,0 +1,68 @@
+Este endpoint de Flask proporciona noticias de NewsAPI y devuelve un JSON con la siguiente estructura:
+jsonCopy{
+  "data": {
+    "status": "ok",
+    "totalResults": 120,
+    "articles": [
+      {
+        "source": {
+          "id": "el-mundo",
+          "name": "El Mundo"
+        },
+        "author": "Nombre del Autor",
+        "title": "Título de la noticia sobre ciberseguridad",
+        "description": "Breve descripción de la noticia",
+        "url": "https://www.ejemplo.com/noticia",
+        "urlToImage": "https://www.ejemplo.com/imagen.jpg",
+        "publishedAt": "2025-03-01T12:30:45Z",
+        "content": "Contenido parcial de la noticia..."
+      },
+      // Más artículos...
+    ]
+  },
+  "parameters": {
+    "query": "ciberseguridad",
+    "language": "es",
+    "sort_by": "relevancy",
+    "page": 1,
+    "from_date": "2025-02-03"
+  }
+}
+Para usar estos datos en React:
+
+Objeto principal:
+
+data: Contiene la respuesta directa de NewsAPI
+parameters: Incluye los parámetros usados en la consulta
+
+
+Dentro de data:
+
+status: Estado de la petición ("ok" o "error")
+totalResults: Número total de artículos encontrados
+articles: Array con los artículos de noticias
+
+
+Cada artículo contiene:
+
+source: Objeto con el id y nombre del medio
+author: Autor del artículo
+title: Título de la noticia
+description: Resumen breve
+url: Enlace al artículo original
+urlToImage: URL de la imagen destacada
+publishedAt: Fecha de publicación en formato ISO
+content: Fragmento del contenido del artículo
+
+
+Parámetros de búsqueda:
+
+query: Término de búsqueda (por defecto "ciberseguridad")
+language: Idioma fijado en español ("es")
+sort_by: Criterio de ordenación (por defecto "relevancy")
+page: Número de página (paginación)
+from_date: Fecha desde la que se buscan noticias (30 días atrás por defecto)
+
+
+
+Este formato facilita mostrar una lista de noticias en React, con información para implementar paginación y filtros.

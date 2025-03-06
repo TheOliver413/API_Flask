@@ -10,6 +10,7 @@ from scapy.all import sr1, IP, ICMP, conf
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
 from newsapi import NewsApiClient #Libreria apra el uso de NewsApi
+from datetime import datetime, timedelta
 
 
 
@@ -343,23 +344,48 @@ if __name__ == '__main__':
 #---------------------------------------------------------------------------------
 #--------------------------------  NEWS API --------------------------------------
 #---------------------------------------------------------------------------------
-@app.route('/news-api', methods=['POST'])
 
-def searchs_notices():
+newsapi = NewsApiClient(api_key='ad037202cf534cacb580a1fb12c97eb4')
+
+
+@app.route('/api/noticias', methods=['GET'])
+def obtener_noticias():
+    try:
+        # Obtener parámetros de la petición (siempre en español)
+        query = request.args.get('query', 'ciberseguridad')
+        sort_by = request.args.get('sort_by', 'relevancy')
+        page = int(request.args.get('page', 1))
+        
+        # Calcular fecha de "desde" (por defecto 30 días atrás)
+        days_back = int(request.args.get('days', 30))
+        from_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
+        
+        # Realizar consulta a NewsAPI siempre en español
+        all_articles = newsapi.get_everything(
+            q=query,
+            from_param=from_date,
+            language='es',
+            sort_by=sort_by,
+            page=page
+        )
+        
+        # Crear respuesta con los resultados y parámetros
+        response = {
+            'data': all_articles,
+            'parameters': {
+                'query': query,
+                'language': 'es',
+                'sort_by': sort_by,
+                'page': page,
+                'from_date': from_date
+            }
+        }
+        
+        return jsonify(response)
     
-    newsapi = NewsApiClient(api_key='ad037202cf534cacb580a1fb12c97eb4')
-
-
-    all_articles = newsapi.get_everything(q='ciberseguridad',
-                                        sources='',
-                                        domains='',
-                                        from_param='2025-02-01',
-                                        to='2025-02-17',
-                                        language='es',
-                                        sort_by='relevancy',
-                                        page=10)
-
-
-    return jsonify(sources = newsapi.get_sources(all_articles))
-
-
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'parameters': request.args
+        }), 500
