@@ -435,3 +435,66 @@ def send_email_route():
         return jsonify({"message": "Error en el servidor"}), 500
 if __name__ == '__main__':
     app.run(debug=False, host="0.0.0.0")
+    
+@app.route('/user/history/<int:user_id>', methods=['GET'])
+def get_user_analysis_history(user_id):
+    print(f"Solicitud recibida para user_id: {user_id}")
+
+    conn = None
+    cur = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        query = """
+            SELECT 
+                a.analysis_id,
+                u.url,
+                u.verification_date,
+                u.status,
+                COALESCE(u.risk_percentage, 0.0) AS url_risk,
+                a.methodology,
+                a.traceroute_result,
+                COALESCE(a.risk_percentage, 0.0) AS analysis_risk,
+                a.analysis_date
+            FROM analysis a
+            JOIN urls u ON a.url_id = u.url_id
+            WHERE u.user_id = %s
+            ORDER BY a.analysis_date DESC;
+        """
+
+        cur.execute(query, (user_id,))
+        results = cur.fetchall()
+
+        if not results:
+            return jsonify({'message': 'No se encontraron análisis para este usuario'}), 404
+
+        history = [
+            {
+                'analysis_id': row[0],
+                'url': row[1],
+                'verification_date': row[2],
+                'status': row[3],
+                'url_risk': row[4],  # Ya está convertido a float en la consulta
+                'methodology': row[5],
+                'traceroute_result': row[6],
+                'analysis_risk': row[7],  # Ya está convertido a float en la consulta
+                'analysis_date': row[8]
+            }
+            for row in results
+        ]
+
+        return jsonify({'user_id': user_id, 'history': history}), 200
+
+    except Exception as e:
+        print(f"Error en la consulta: {e}")
+        return jsonify({'error': 'Error interno del servidor'}), 500
+
+    finally:
+        if cur:
+            cur.close()
+        if conn:
+            conn.close()
+
+if __name__ == '__main__':
+    app.run(debug=False, host="0.0.0.0")
