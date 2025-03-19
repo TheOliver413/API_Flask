@@ -25,6 +25,7 @@ Asegúrate de tener instalados los siguientes requisitos en tu sistema:
 - pip install scapy
 - pip install secure-smtplib
 - pip install psycopg2-binary
+- pip install newsapi-python
 
 
 2. **Uso:**

@@ -11,6 +11,8 @@ from scapy.all import sr1, IP, ICMP, conf, traceroute
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
 from urllib.parse import urlparse
+from newsapi import NewsApiClient #Libreria apra el uso de NewsApi
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.config["JWT_SECRET_KEY"] = "your_secret_key"  # Cambia esto por una clave secreta segura
@@ -269,6 +271,57 @@ def calcular_riesgo(phishing_message, reputation_result):
 
     print("Riesgo calculado:", riesgo)
     return riesgo
+
+#--------------------------------  NEWS API --------------------------------------
+#---------------------------------------------------------------------------------
+
+@app.route('/test', methods=['POST'])
+def test():
+    return jsonify({"message": "Ruta GET funcionando correctamente"}), 200
+
+newsapi = NewsApiClient(api_key='ad037202cf534cacb580a1fb12c97eb4')
+
+@app.route('/news', methods=['GET'])
+def searchs_news():
+    try:
+        # Obtener parámetros de la petición (siempre en español)
+        query = request.args.get('query', 'ciberseguridad')
+        sort_by = request.args.get('sort_by', 'relevancy')
+        page = int(request.args.get('page', 1))
+
+        # Calcular fecha de "desde" (por defecto 30 días atrás)
+        days_back = int(request.args.get('days', 30))
+        from_date = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
+
+        # Realizar consulta a NewsAPI siempre en español
+        all_articles = newsapi.get_everything(
+            q=query,
+            from_param=from_date,
+            language='es',
+            sort_by=sort_by,
+            page=page
+        )
+
+        # Crear respuesta con los resultados y parámetros
+        response = {
+            'data': all_articles,
+            'parameters': {
+                'query': query,
+                'language': 'es',
+                'sort_by': sort_by,
+                'page': page,
+                'from_date': from_date
+            }
+        }
+
+        return jsonify(response)
+
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'parameters': request.args
+        }), 500
 
 @app.route('/validate_url', methods=['POST'])
 def validate_url():
