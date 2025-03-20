@@ -19,3 +19,4 @@ secure-smtplib
 urllib3
 Werkzeug
 yagmail
+newsapi-python
