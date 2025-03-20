@@ -12,7 +12,7 @@ try:
         host='dpg-cvdngmrv2p9s7393egmg-a.oregon-postgres.render.com',
         user='phishguard_mb4u_user',
         password='RmLenVgjCG0tgzL1iKAh61AYGq2lw1zv',
-        database='PhishGuard'
+        database='phishguard_mb4u'
     )
 
     print("Ok")
