@@ -50,6 +50,17 @@ CREATE TABLE IF NOT EXISTS public.analysis (
     CONSTRAINT fk_analysis_urls FOREIGN KEY (url_id) REFERENCES public.urls (url_id) ON DELETE CASCADE
 );
 
+CREATE TABLE news (
+    id SERIAL PRIMARY KEY,
+    title TEXT,
+    description TEXT,
+    url TEXT,
+    url_to_image TEXT,
+    published_at TIMESTAMP,
+    source TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Indexes
 CREATE INDEX idx_users_email ON public.users (email);
 CREATE INDEX idx_urls_status ON public.urls (status);
