@@ -30,10 +30,10 @@ def get_db_connection():
         #     database='phishguard'
         # )
         conn = psycopg2.connect(
-            host='dpg-cvdngmrv2p9s7393egmg-a.oregon-postgres.render.com',
-            user='phishguard_mb4u_user',
-            password='RmLenVgjCG0tgzL1iKAh61AYGq2lw1zv',
-            database='phishguard_mb4u'
+            host='ep-wild-term-a2zxk9ae.eu-central-1.aws.neon.tech',
+            user='neondb_owner',
+            password='npg_brlfMLFIC9o0',
+            database='neondb'
         )
         print("✅ Conexión a la base de datos establecida correctamente.")
         return conn
@@ -284,9 +284,71 @@ def calcular_riesgo(phishing_message, reputation_result):
 #---------------------------------------------------------------------------------
 newsapi = NewsApiClient(api_key='bae2ab12dcd841a6a36e257e898ab749')
 
+if __name__ == '__main__':
+    app.run(debug=False, host="0.0.0.0")
+
+# Función para actualizar noticias cada 6 horas
+def update_news():
+    print("🔄 update_news inicio")
+    
+    conn = get_db_connection()
+    if not conn:
+        print("❌ No se pudo conectar a la base de datos para actualizar noticias.")
+        return
+
+    try:
+        topics = ['ciberseguridad', 'fraude digital', 'phishing', 'seguridad informática', 'protección de datos']
+        sort_by = 'relevancy'
+        from_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+
+        with conn.cursor() as cur:
+            print("🗑 Eliminando noticias antiguas...")
+            cur.execute("DELETE FROM news WHERE published_at < NOW() - INTERVAL '7 days'")
+            print("✅ Noticias antiguas eliminadas.")
+
+            for topic in topics:
+                print(f"📡 Obteniendo noticias sobre: {topic}")
+                all_articles = newsapi.get_everything(q=topic, from_param=from_date, language='es', sort_by=sort_by)
+                
+                if 'articles' in all_articles and all_articles['articles']:
+                    print(f"📩 {len(all_articles['articles'])} noticias encontradas para {topic}")
+                else:
+                    print(f"⚠ No se encontraron noticias para {topic}")
+
+                for article in all_articles['articles']:
+                    cur.execute("""
+                        INSERT INTO news (title, description, url, url_to_image, published_at, source)
+                        VALUES (%s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (url) DO NOTHING
+                    """, (article['title'], article['description'], article['url'], article['urlToImage'], article['publishedAt'], article['source']['name']))
+
+        conn.commit()
+        print("✅ Noticias actualizadas correctamente.")
+
+    except Exception as e:
+        print(f"❌ Error al actualizar noticias: {e}")
+
+    finally:
+        conn.close()
+        print("🔚 update_news finalizado")
+        
+# Programar la tarea para que se ejecute cada 6 horas
+schedule.every(6).hours.do(update_news)
+
+print("⏳ El proceso de actualización de noticias está en ejecución...")
+
+# Bucle infinito para ejecutar tareas programadas
+if __name__ == "__main__":
+    while True:
+        schedule.run_pending()
+        time.sleep(60)  # Espera 1 minuto entre verificaciones
+        
 # Ruta para obtener noticias
 @app.route('/news', methods=['GET'])
 def get_news():
+    # 🆕 Llamar a update_news antes de obtener noticias
+    update_news()
+    
     conn = get_db_connection()
     if not conn:
         return jsonify({'status': 'error', 'message': 'No se pudo conectar a la base de datos'}), 500
@@ -462,7 +524,6 @@ def login():
 
     return jsonify({'msg': 'Login exitoso', 'access_token': access_token, 'user': user_data})
 
-
 # Ruta protegida que requiere autenticación JWT
 @app.route('/protected', methods=['GET'])
 @jwt_required()
@@ -552,62 +613,3 @@ def get_user_analysis_history(user_id):
             cur.close()
         if conn:
             conn.close()
-
-if __name__ == '__main__':
-    app.run(debug=False, host="0.0.0.0")
-
-# Función para actualizar noticias cada 6 horas
-def update_news():
-    print("🔄 update_news inicio")
-    
-    conn = get_db_connection()
-    if not conn:
-        print("❌ No se pudo conectar a la base de datos para actualizar noticias.")
-        return
-
-    try:
-        topics = ['ciberseguridad', 'fraude digital', 'phishing', 'seguridad informática', 'protección de datos']
-        sort_by = 'relevancy'
-        from_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
-
-        with conn.cursor() as cur:
-            print("🗑 Eliminando noticias antiguas...")
-            cur.execute("DELETE FROM news WHERE published_at < NOW() - INTERVAL '7 days'")
-            print("✅ Noticias antiguas eliminadas.")
-
-            for topic in topics:
-                print(f"📡 Obteniendo noticias sobre: {topic}")
-                all_articles = newsapi.get_everything(q=topic, from_param=from_date, language='es', sort_by=sort_by)
-                
-                if 'articles' in all_articles and all_articles['articles']:
-                    print(f"📩 {len(all_articles['articles'])} noticias encontradas para {topic}")
-                else:
-                    print(f"⚠ No se encontraron noticias para {topic}")
-
-                for article in all_articles['articles']:
-                    cur.execute("""
-                        INSERT INTO news (title, description, url, url_to_image, published_at, source)
-                        VALUES (%s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (url) DO NOTHING
-                    """, (article['title'], article['description'], article['url'], article['urlToImage'], article['publishedAt'], article['source']['name']))
-
-        conn.commit()
-        print("✅ Noticias actualizadas correctamente.")
-
-    except Exception as e:
-        print(f"❌ Error al actualizar noticias: {e}")
-
-    finally:
-        conn.close()
-        print("🔚 update_news finalizado")
-        
-# Programar la tarea para que se ejecute cada 6 horas
-schedule.every(6).hours.do(update_news)
-
-print("⏳ El proceso de actualización de noticias está en ejecución...")
-
-# Bucle infinito para ejecutar tareas programadas
-if __name__ == "__main__":
-    while True:
-        schedule.run_pending()
-        time.sleep(60)  # Espera 1 minuto entre verificaciones

@@ -9,10 +9,10 @@ try:
     # )
     
     connection=psycopg2.connect(
-        host='dpg-cvdngmrv2p9s7393egmg-a.oregon-postgres.render.com',
-        user='phishguard_mb4u_user',
-        password='RmLenVgjCG0tgzL1iKAh61AYGq2lw1zv',
-        database='phishguard_mb4u'
+        host='ep-wild-term-a2zxk9ae.eu-central-1.aws.neon.tech',
+        user='neondb_owner',
+        password='npg_brlfMLFIC9o0',
+        database='neondb'
     )
 
     print("Ok")
