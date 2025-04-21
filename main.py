@@ -284,9 +284,6 @@ def calcular_riesgo(phishing_message, reputation_result):
 #---------------------------------------------------------------------------------
 newsapi = NewsApiClient(api_key='bae2ab12dcd841a6a36e257e898ab749')
 
-if __name__ == '__main__':
-    app.run(debug=False, host="0.0.0.0")
-
 # Función para actualizar noticias cada 6 horas
 def update_news():
     print("🔄 update_news inicio")
@@ -331,17 +328,6 @@ def update_news():
     finally:
         conn.close()
         print("🔚 update_news finalizado")
-        
-# Programar la tarea para que se ejecute cada 6 horas
-schedule.every(6).hours.do(update_news)
-
-print("⏳ El proceso de actualización de noticias está en ejecución...")
-
-# Bucle infinito para ejecutar tareas programadas
-if __name__ == "__main__":
-    while True:
-        schedule.run_pending()
-        time.sleep(60)  # Espera 1 minuto entre verificaciones
         
 # Ruta para obtener noticias
 @app.route('/news', methods=['GET'])
@@ -389,6 +375,8 @@ def get_news():
 
     finally:
         conn.close()
+  
+# Validacion de URL´s
 @app.route('/validate_url', methods=['POST'])
 def validate_url():
     data = request.json
@@ -532,6 +520,7 @@ def protected():
     current_user = get_jwt_identity()
     return jsonify({'msg': f'Acceso permitido, usuario {current_user}'})
 
+# Envio de correos
 @app.route('/send-email', methods=['POST'])
 def send_email_route():
     try:
@@ -613,3 +602,19 @@ def get_user_analysis_history(user_id):
             cur.close()
         if conn:
             conn.close()
+            
+
+if __name__ == '__main__':
+    app.run(debug=False, host="0.0.0.0")
+                
+# Programar la tarea para que se ejecute cada 6 horas
+schedule.every(6).hours.do(update_news)
+
+print("⏳ El proceso de actualización de noticias está en ejecución...")
+
+# Bucle infinito para ejecutar tareas programadas
+if __name__ == "__main__":
+    while True:
+        schedule.run_pending()
+        time.sleep(60)  # Espera 1 minuto entre verificaciones
+        

@@ -65,3 +65,4 @@ CREATE TABLE news (
 CREATE INDEX idx_users_email ON public.users (email);
 CREATE INDEX idx_urls_status ON public.urls (status);
 CREATE INDEX idx_analysis_date ON public.analysis (analysis_date);
+ALTER TABLE news ADD CONSTRAINT unique_url UNIQUE (url);
